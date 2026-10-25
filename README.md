@@ -20,7 +20,7 @@
 
 ## 発表資料
 
-[JPHACKプレゼンテーション（PowerPoint）](docs/slides/JPHACKプレゼンテーション_最終版.pptx?raw=true)
+[JPHACKプレゼンテーション（PowerPoint）](docs/slides/JPHACKプレゼンテーション.pptx?raw=true)
 
 発表で使用したスライドをダウンロードできます。
 
