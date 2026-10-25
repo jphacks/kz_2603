@@ -20,7 +20,7 @@
 
 ## 発表資料
 
-[JPHACKプレゼンテーション（PowerPoint）](docs/slides/JPHACKプレゼンテーション.pptx?raw=true)
+[JPHACKプレゼンテーション（PowerPoint）](https://raw.githubusercontent.com/jphacks/kz_2603/main/docs/slides/JPHACK%E3%83%97%E3%83%AC%E3%82%BC%E3%83%B3%E3%83%86%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3.pptx)
 
 発表で使用したスライドをダウンロードできます。
 
