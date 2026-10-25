@@ -95,10 +95,16 @@ class FrontendUiTest {
         val model = showApp()
         compose.onNodeWithTag("tab-CLOSET").performClick()
         compose.onNodeWithTag("closet-screen").assertExists()
-        compose.onNodeWithText("上の服").assertExists()
-        compose.onNodeWithText("下の服").assertExists()
+        // 最初は上の服だけ。タブで下の服に切り替えられる
+        compose.onNodeWithTag("closet-slot-upper").assertIsSelected()
+        compose.onNodeWithText("上の服 · 2枚").assertExists()
         compose.onNodeWithText("白のTシャツ").assertExists()
+        compose.onNodeWithText("紺のズボン").assertDoesNotExist()
+        compose.onNodeWithText("下の服 · 1枚").performClick()
+        compose.onNodeWithTag("closet-slot-lower").assertIsSelected()
         compose.onNodeWithText("紺のズボン").assertExists()
+        compose.onNodeWithText("白のTシャツ").assertDoesNotExist()
+        compose.onNodeWithTag("closet-slot-upper").performClick()
         // やめれば消えない
         compose.onNodeWithTag("closet-delete-preview-1").performClick()
         compose.onNodeWithTag("closet-delete-dialog").assertExists()
@@ -111,6 +117,7 @@ class FrontendUiTest {
         compose.waitForIdle()
         compose.onNodeWithTag("closet-item-preview-1").assertDoesNotExist()
         compose.onNodeWithText("ベージュのカーディガン").assertExists()
+        compose.onNodeWithText("上の服 · 1枚").assertExists()
         compose.runOnIdle { assertEquals(listOf("preview-2", "preview-3"), model.closet.map { it.id }) }
     }
 

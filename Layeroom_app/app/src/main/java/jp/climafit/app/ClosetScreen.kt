@@ -2,6 +2,8 @@ package jp.climafit.app
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,49 +13,61 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/** クローゼット：保存した上の服・下の服の一覧と削除。服が増えるのは写真でコーデ診断で保存したときだけ。 */
+/** クローゼット：保存した服の一覧（上のタブで上の服・下の服を切り替え）と削除。服が増えるのは写真でコーデ診断で保存したときだけ。 */
 @Composable
 internal fun ClosetScreen(model: LayeRoomViewModel) {
     var confirming by rememberSaveable { mutableStateOf<String?>(null) }
+    var slot by rememberSaveable { mutableStateOf("upper") }
     // 開くたびに読み直す（写真でコーデ診断で保存した服を反映するため）
     LaunchedEffect(Unit) { model.loadCloset() }
     val closet = model.closet
-    LazyColumn(Modifier.fillMaxSize().testTag("closet-screen"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Text("写真でコーデ診断で保存した服が、ここに並びます。", Modifier.padding(horizontal = 4.dp),
-                style = MaterialTheme.typography.bodyMedium, color = Muted)
-        }
-        if (closet.isEmpty()) {
-            item {
-                UiCard(Modifier.testTag("closet-empty")) {
-                    if (model.loadingCloset) CircularProgressIndicator()
-                    else Text("まだ服がありません。ホームの「写真でコーデ診断」で保存すると、ここに服が増えます。", color = Muted)
+    val label = if (slot == "upper") "上の服" else "下の服"
+    val clothes = closet.filter { it.slot == slot }
+    Column(Modifier.fillMaxSize()) {
+        // 上の服・下の服を切り替えるタブ（グレーの入れ物に、選んだほうだけ黒）
+        Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp).fillMaxWidth()
+            .background(Tile, RoundedCornerShape(14.dp)).padding(4.dp).selectableGroup()) {
+            for ((value, name) in listOf("upper" to "上の服", "lower" to "下の服")) {
+                val selected = slot == value
+                Box(Modifier.weight(1f).heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp))
+                    .background(if (selected) Ink else Color.Transparent)
+                    .selectable(selected = selected, role = Role.Tab, onClick = { slot = value })
+                    .testTag("closet-slot-$value"), contentAlignment = Alignment.Center) {
+                    Text("$name · ${closet.count { it.slot == value }}枚", style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold, color = if (selected) Color.White else Muted)
                 }
             }
-        } else {
-            for ((slot, label) in listOf("upper" to "上の服", "lower" to "下の服")) {
-                val clothes = closet.filter { it.slot == slot }
-                item(key = "header-$slot") { SectionHeader(label, trailing = "${clothes.size}枚") }
-                if (clothes.isEmpty()) item(key = "empty-$slot") { UiCard { Text("${label}はまだありません。", color = Muted) } }
-                // 2列に並べる
-                items(clothes.chunked(2), key = { row -> "$slot-${row.first().id}" }) { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        row.forEach { item ->
-                            ClothingTile(item, deleting = model.deletingClothing == item.id, modifier = Modifier.weight(1f)) {
-                                confirming = item.id
-                            }
-                        }
-                        if (row.size == 1) Spacer(Modifier.weight(1f))
+        }
+        LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("closet-screen"),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (clothes.isEmpty()) {
+                item(key = "empty-$slot") {
+                    UiCard(Modifier.testTag("closet-empty")) {
+                        if (model.loadingCloset) CircularProgressIndicator()
+                        else Text("${label}はまだありません。ホームの「写真でコーデ診断」で保存すると、ここに服が増えます。", color = Muted)
                     }
+                }
+            }
+            // 2列に並べる
+            items(clothes.chunked(2), key = { row -> "$slot-${row.first().id}" }) { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { item ->
+                        ClothingTile(item, deleting = model.deletingClothing == item.id, modifier = Modifier.weight(1f)) {
+                            confirming = item.id
+                        }
+                    }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         }

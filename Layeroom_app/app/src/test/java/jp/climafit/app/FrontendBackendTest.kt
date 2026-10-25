@@ -278,7 +278,9 @@ class FrontendBackendTest {
             assertEquals(listOf("upper", "upper"), model.closet.filter { it.title in setOf("白のシャツ", "灰のニット") }.map { it.slot })
         }
         compose.onNodeWithText("灰のニット").assertExists()
+        compose.onNodeWithTag("closet-slot-lower").performClick()
         compose.onNodeWithText("青のジーンズ").assertExists()
+        compose.onNodeWithTag("closet-slot-upper").performClick()
         compose.onNodeWithTag("closet-delete-3").performScrollTo().performClick()
         compose.onNodeWithTag("closet-delete-confirm").performClick()
         waitFor { model.closet.none { it.id == "3" } }
