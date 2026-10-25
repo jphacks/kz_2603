@@ -369,11 +369,16 @@ class BackendTest {
             val model = Json.parseToJsonElement(String(req.body.toByteArray())).jsonObject["model"].toString().trim('"')
             tried += model
             assertEquals("Bearer sk-test", req.headers["Authorization"])
-            if (model == "gpt-4o") respond("{}", HttpStatusCode.NotFound, json)
-            else respond("""{"choices":[{"message":{"content":"{\"is_outfit_photo\":true,\"items\":[{\"type\":\"shirt\",\"color\":\"白\",\"thickness\":\"thin\",\"season\":\"all\",\"bbox\":{\"x\":0.1,\"y\":0.1,\"w\":0.5,\"h\":0.4},\"confidence\":0.9}],\"note\":\"\"}"}}]}""", HttpStatusCode.OK, json)
+            when (model) {
+                "new-model" -> respond("""{"error":{"message":"Unsupported parameter: temperature"}}""", HttpStatusCode.BadRequest, json)
+                "gpt-4o" -> respond("{}", HttpStatusCode.NotFound, json)
+                else -> respond("""{"choices":[{"message":{"content":"{\"is_outfit_photo\":true,\"items\":[{\"type\":\"shirt\",\"color\":\"白\",\"thickness\":\"thin\",\"season\":\"all\",\"bbox\":{\"x\":0.1,\"y\":0.1,\"w\":0.5,\"h\":0.4},\"confidence\":0.9}],\"note\":\"\"}"}}]}""", HttpStatusCode.OK, json)
+            }
         }) { expectSuccess = false }
-        val a = jp.climafit.backend.ai.OpenAiVision(OpenAi(http, "sk-test")).analyze(byteArrayOf(1))
-        assertEquals(listOf("gpt-4o", "gpt-4o-mini"), tried)
+        // 受け付けない(400)・使えない(404)モデルは飛ばして、次のモデルを試す
+        val ai = OpenAi(http, "sk-test", models = listOf("new-model", "gpt-4o", "gpt-4o-mini"))
+        val a = jp.climafit.backend.ai.OpenAiVision(ai).analyze(byteArrayOf(1))
+        assertEquals(listOf("new-model", "gpt-4o", "gpt-4o-mini"), tried)
         assertEquals(WornItem("shirt", "thin", "白", "all", 0.9, Box(0.1, 0.1, 0.5, 0.4)), a.items.single())
 
         val broken = HttpClient(MockEngine { respond("boom", HttpStatusCode.InternalServerError) }) { expectSuccess = false }
