@@ -91,11 +91,13 @@ class LayeRoomViewModel(application: Application, private val backend: LayeRoomB
     fun requestPhotoPreview() {
         val selectedPhoto = photo ?: return
         if (loadingPhoto) return
+        refreshConditions()
         latestAiRequest = AiRequestUi(AiMode.PHOTO, photo = selectedPhoto, location = roomName,
             indoorTemperature = room.temperature, outdoorTemperature = outdoorTemperature)
         diagnose()
     }
     fun requestSuggestionPreview() {
+        refreshConditions()
         latestAiRequest = AiRequestUi(AiMode.SUGGEST, prompt = TODAY_OUTFIT_PROMPT, location = roomName,
             indoorTemperature = room.temperature, outdoorTemperature = outdoorTemperature)
         loadSuggestion()
@@ -180,16 +182,44 @@ class LayeRoomViewModel(application: Application, private val backend: LayeRoomB
         val b = backend ?: return
         viewModelScope.launch {
             try {
-                val loaded = b.rooms().map { it.toUi() }
-                if (loaded.isNotEmpty()) {
-                    rooms = loaded
-                    if (loaded.none { it.name == roomName }) roomName = loaded.first().name
-                }
-                b.conditions(null).outdoor?.temperature?.let { outdoorTemperature = it }
+                loadConditions(b)
             } catch (e: BackendException) {
                 message(errorText(e))
             }
             loadLogs()
+        }
+    }
+
+    private var conditionsJob: Job? = null
+
+    /**
+     * 室温・金沢の気温だけを読み直す（アプリを開いている間の定期更新と、AI に聞く直前）。
+     * 定期更新なので、つながらなくてもメッセージは出さない（前の値のまま）。
+     */
+    fun refreshConditions() {
+        val b = backend ?: return
+        if (conditionsJob?.isActive == true) return
+        conditionsJob = viewModelScope.launch {
+            try { loadConditions(b) } catch (e: BackendException) { Log.w("LayeRoom", "conditions refresh failed", e) }
+        }
+    }
+
+    private suspend fun loadConditions(b: LayeRoomBackend) {
+        val loaded = b.rooms().map { it.toUi() }
+        if (loaded.isNotEmpty()) {
+            rooms = loaded
+            if (loaded.none { it.name == roomName }) roomName = loaded.first().name
+        }
+        b.conditions(null).outdoor?.temperature?.let { outdoorTemperature = it }
+    }
+
+    /** AI が判定に使った温度を、画面の表示にもそのまま使う（表示と AI の温度がずれないように）。 */
+    private fun showUsedTemperatures(mode: AiMode, place: String, indoor: Double, outdoor: Double?) {
+        rooms = rooms.map { if (it.name == place) it.copy(temperature = indoor) else it }
+        outdoor?.let { outdoorTemperature = it }
+        val request = latestAiRequest ?: return
+        if (request.mode == mode && request.location == place) {
+            latestAiRequest = request.copy(indoorTemperature = indoor, outdoorTemperature = outdoor ?: request.outdoorTemperature)
         }
     }
 
@@ -223,7 +253,10 @@ class LayeRoomViewModel(application: Application, private val backend: LayeRoomB
             try {
                 val r = b.review(bytes, place)
                 val images = withContext(Dispatchers.Default) { r.itemImages.map { it?.let(::decode) } }
-                if (version == photoVersion) { diagnosis = r; diagnosisImages = images }
+                if (version == photoVersion) {
+                    diagnosis = r; diagnosisImages = images
+                    showUsedTemperatures(AiMode.PHOTO, place, r.indoorTemp, r.outdoorTemp)
+                }
             } catch (e: BackendException) {
                 if (version == photoVersion) diagnosisError = errorText(e)
             } finally {
@@ -262,6 +295,7 @@ class LayeRoomViewModel(application: Application, private val backend: LayeRoomB
             try {
                 val s = b.suggestions(place)
                 suggestion = s
+                showUsedTemperatures(AiMode.SUGGEST, place, s.indoorTemp, s.outdoorTemp)
                 s.suggestions.firstOrNull()?.let { first ->
                     // まず上下を並べた画像をすぐ出し、マネキン画像ができたら差し替える
                     suggestionImage = runCatching { decode(b.comboImage(first.upperId, first.lowerId)) }.getOrNull()

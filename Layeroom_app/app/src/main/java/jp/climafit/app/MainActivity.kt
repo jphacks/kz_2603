@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,7 +36,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private enum class Tab(val label: String, val icon: Int) {
     OUTFITS("気温別コーデ", R.drawable.ic_nav_outfits),
@@ -44,13 +50,26 @@ private enum class Tab(val label: String, val icon: Int) {
 }
 private enum class RoomPicker { HOME, COMMUNITY }
 
+/** 室温・金沢の気温を読み直す間隔（センサーは5分ごとに送るので、届いたら1分以内に表示が変わる）。 */
+private const val CONDITIONS_REFRESH_MILLIS = 60_000L
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         // local.properties に db_server の設定があればバックエンドにつなぐ（無ければサンプル表示）
         val backend = (application as? LayeRoomApplication)?.backend
-        setContent { LayeRoomTheme { LayeRoomApp(viewModel(factory = LayeRoomViewModel.Factory(application, backend))) } }
+        val model: LayeRoomViewModel by viewModels { LayeRoomViewModel.Factory(application, backend) }
+        // 開いている間は室温・金沢の気温を定期的に読み直す（戻ってきたときもすぐ読み直す）
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    model.refreshConditions()
+                    delay(CONDITIONS_REFRESH_MILLIS)
+                }
+            }
+        }
+        setContent { LayeRoomTheme { LayeRoomApp(model) } }
     }
 }
 @Composable

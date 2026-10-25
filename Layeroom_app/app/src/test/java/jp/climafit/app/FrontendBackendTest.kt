@@ -59,6 +59,8 @@ class FrontendBackendTest {
     /** db_server に届いたリクエスト（"POST /outfits" と本文）。 */
     private val calls = Collections.synchronizedList(mutableListOf<Pair<String, String>>())
     private var garmentId = 30
+    /** センサーの部屋（201教室）の今の室温。テストの途中で変えて、表示が追いつくかを見る。 */
+    @Volatile private var sensorTemp = 23.4
 
     private fun jpeg(): ByteArray = ByteArrayOutputStream().also {
         Bitmap.createBitmap(40, 60, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.GRAY) }
@@ -78,9 +80,9 @@ class FrontendBackendTest {
             "POST /users" -> ok("""{"id":7,"user_id":7,"name":"x","token":"tok7"}""", HttpStatusCode.Created)
             "GET /rooms" -> ok("""[
                 {"id":1,"name":"図書館","temperature":21.0,"humidity":48.0,"is_dummy":true,"temperature_source":"dummy","humidity_source":"dummy","stale":false,"today":{"total":1}},
-                {"id":2,"name":"201教室","temperature":23.4,"humidity":55.0,"is_dummy":false,"temperature_source":"sensor","humidity_source":"dummy","stale":false,"today":{"total":0}}]""")
+                {"id":2,"name":"201教室","temperature":$sensorTemp,"humidity":55.0,"is_dummy":false,"temperature_source":"sensor","humidity_source":"dummy","stale":false,"today":{"total":0}}]""")
             "GET /conditions/latest" -> {
-                val t = if (req.url.parameters["classroom"] == "201教室") 23.4 else 21.0
+                val t = if (req.url.parameters["classroom"] != "図書館") sensorTemp else 21.0
                 ok("""{"indoor":{"room_name":"${req.url.parameters["classroom"] ?: "201教室"}","temperature":$t,"humidity":55.0,
                     "temperature_source":"sensor","humidity_source":"dummy"},"outdoor":{"temperature":16.0,"humidity":80.0}}""")
             }
@@ -239,6 +241,32 @@ class FrontendBackendTest {
         compose.onNodeWithTag("save-outfit").performScrollTo().performClick()
         waitFor { model.suggestionSaved }
         assertEquals(1, called("POST /users/7/recommendations").size)
+    }
+
+    @Test fun refreshConditionsShowsTheLatestRoomTemperature() {
+        val model = showApp()
+        compose.runOnIdle { assertEquals(23.4, model.rooms.first { it.name == "201教室" }.temperature, 0.0) }
+        sensorTemp = 24.6   // センサーから新しい値が届いた
+        model.refreshConditions()
+        waitFor { model.rooms.first { it.name == "201教室" }.temperature == 24.6 }
+    }
+
+    @Test fun suggestionScreenShowsTheTemperatureTheAiUsed() {
+        val model = showApp()
+        compose.onNodeWithTag("home-screen").performScrollToNode(hasTestTag("home-room-picker"))
+        compose.onNodeWithTag("home-room-picker").performClick()
+        selectLocation("201教室")
+        // 画面は 23.4℃ のまま、サーバーの室温だけ上がった状態で提案を頼む
+        sensorTemp = 25.1
+        compose.onNodeWithTag("home-screen").performScrollToNode(hasTestTag("home-suggestion"))
+        compose.onNodeWithTag("home-suggestion").performTouchInput { click(androidx.compose.ui.geometry.Offset(center.x, height - 12f)) }
+        waitFor { model.suggestion != null || model.suggestionError != null }
+        assertEquals(25.1, model.suggestion!!.indoorTemp, 0.0)
+        compose.runOnIdle {
+            assertEquals(25.1, model.latestAiRequest!!.indoorTemperature, 0.0)
+            assertEquals(25.1, model.room.temperature, 0.0)
+        }
+        compose.onNodeWithText("201教室 · 室温 ${formatTemp(25.1)}℃").assertExists()
     }
 
     @Test fun communityShowsServerPostsAndPosts() {
