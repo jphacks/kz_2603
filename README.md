@@ -228,7 +228,7 @@ kz_2603/
 │           └── image/                 写真の切り抜き・合成
 ├── db_server/                  DB サーバー（FastAPI + PostgreSQL、Docker Compose）
 │   ├── docker-compose.yml
-│   ├── .env.example            設定のひな形
+│   ├── .env.example            設定の見本（コピーして .env を作る）
 │   └── api/app/
 │       ├── main.py             起動処理・天気の定期取得
 │       ├── models.py           テーブル定義
