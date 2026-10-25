@@ -14,6 +14,7 @@
 - [リポジトリ構成](#リポジトリ構成)
 - [システム構成図](#システム構成図)
 - [各部分の役割](#各部分の役割)
+- [ディレクトリ構成](#ディレクトリ構成)
 - [写真診断から保存まで](#写真診断から保存まで)
 
 ---
@@ -196,6 +197,49 @@ flowchart TB
 | OpenAI | 服の種類・色・厚さ・位置の認識、説明文・着用画像生成 | Chat Completions、Images API |
 | Open-Meteo | 現在の気象と当日の予報を提供 | 天気 API |
 
+## ディレクトリ構成
+
+主なファイルだけを載せています（テスト・画像素材・Gradle の設定などは省略）。
+
+```
+kz_2603/
+├── README.md
+├── LICENSE
+├── docs/                       発表資料・デモ動画・画像
+│   ├── images/
+│   ├── slides/                 発表スライド（PowerPoint）
+│   └── videos/                 機能ごとのデモ動画
+├── Layeroom_app/               Android アプリ（Android Studio ではここを開く）
+│   ├── app/                    画面（Kotlin / Jetpack Compose）
+│   │   └── src/main/java/jp/climafit/app/
+│   │       ├── MainActivity.kt        タブと画面の切り替え
+│   │       ├── HomeScreen.kt          ホーム
+│   │       ├── CameraScreen.kt        アプリ内カメラ
+│   │       ├── AiStatusScreen.kt      写真診断・おすすめの結果
+│   │       ├── OutfitScreens.kt       気温別コーデ
+│   │       ├── CommunityScreen.kt     今日のひろば
+│   │       ├── ClosetScreen.kt        クローゼット
+│   │       └── LayeRoomViewModel.kt   画面の状態・backend の呼び出し
+│   └── backend/                端末内で動くバックエンド
+│       └── src/main/java/jp/climafit/backend/
+│           ├── LayeRoomBackend.kt     診断・提案・保存のまとめ役
+│           ├── ai/                    判定・提案の計算と OpenAI の呼び出し
+│           ├── db/                    db_server との通信
+│           └── image/                 写真の切り抜き・合成
+├── db_server/                  DB サーバー（FastAPI + PostgreSQL、Docker Compose）
+│   ├── docker-compose.yml
+│   ├── .env.example            設定のひな形
+│   └── api/app/
+│       ├── main.py             起動処理・天気の定期取得
+│       ├── models.py           テーブル定義
+│       ├── indoor.py           部屋ごとの室温（実測・仮の値）
+│       ├── weather.py          Open-Meteo からの天気取得
+│       └── routers/            API（ユーザー・気象・コーデ・服・おすすめ・ひろば）
+└── arduino/                    室温センサー（Arduino UNO R4 WiFi）
+    └── sensor_sender/
+        └── sensor_sender.ino   室温を5分ごとに送る
+```
+
 ## 写真診断から保存まで
 
 ```mermaid
@@ -226,11 +270,6 @@ sequenceDiagram
     B->>S: 上下の服の画像・メタデータを順次送信
     S->>DB: 服を記録
     B-->>UI: 保存完了
-```
-```
-Arduino（室温） ──▶ DB サーバー ◀── 天気（Open-Meteo）
-                       ▲
-Android アプリ ────────┘   写真の読み取り・提案の画像は OpenAI
 ```
 
 <!-- TODO: チームメンバーと担当を書く -->
