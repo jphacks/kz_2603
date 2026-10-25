@@ -90,6 +90,7 @@ class FrontendBackendTest {
                 garment(3, "upper", "knit", "灰", 0.35), garment(4, "lower", "jeans", "青", 0.25)).joinToString(",") + "]")
             "GET /users/7/outfits" -> ok("""[{"id":9,"taken_at":"2026-10-20T03:00:00Z","verdict":"good","comment":"ちょうどよかった",
                 "conditions":{"indoor":{"room_name":"図書館","temperature":21.0},"outdoor":{"temperature":16.0}},"garments":[{"id":1},{"id":2}]}]""")
+            "PATCH /garments/3/meta" -> ok("""{"id":3,"outfit_id":1,"part":"top","meta":{"hidden":true}}""")
             "POST /outfits" -> ok("""{"id":11}""", HttpStatusCode.Created)
             "POST /outfits/11/garments" -> ok("""{"id":${garmentId++}}""", HttpStatusCode.Created)
             "POST /users/7/recommendations" -> ok("{}", HttpStatusCode.Created)
@@ -267,6 +268,24 @@ class FrontendBackendTest {
             assertEquals(25.1, model.room.temperature, 0.0)
         }
         compose.onNodeWithText("201教室 · 室温 ${formatTemp(25.1)}℃").assertExists()
+    }
+
+    @Test fun closetShowsSavedClothesAndHidesTheDeletedOne() {
+        val model = showApp()
+        compose.onNodeWithTag("tab-CLOSET").performClick()
+        waitFor { model.closet.size == 4 }
+        compose.runOnIdle {
+            assertEquals(listOf("upper", "upper"), model.closet.filter { it.title in setOf("白のシャツ", "灰のニット") }.map { it.slot })
+        }
+        compose.onNodeWithText("灰のニット").assertExists()
+        compose.onNodeWithText("青のジーンズ").assertExists()
+        compose.onNodeWithTag("closet-delete-3").performScrollTo().performClick()
+        compose.onNodeWithTag("closet-delete-confirm").performClick()
+        waitFor { model.closet.none { it.id == "3" } }
+        // サーバーでは消さずに隠す
+        val patch = called("PATCH /garments/3/meta").single()
+        assertTrue(patch.second, patch.second.contains("\"hidden\":true"))
+        assertEquals(3, model.closet.size)
     }
 
     @Test fun communityShowsServerPostsAndPosts() {

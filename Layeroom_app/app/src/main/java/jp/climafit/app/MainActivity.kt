@@ -44,9 +44,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class Tab(val label: String, val icon: Int) {
-    OUTFITS("気温別コーデ", R.drawable.ic_nav_outfits),
     HOME("ホーム", R.drawable.ic_home),
-    COMMUNITY("今日のひろば", R.drawable.ic_nav_people)
+    OUTFITS("気温別コーデ", R.drawable.ic_nav_outfits),
+    COMMUNITY("今日のひろば", R.drawable.ic_nav_people),
+    CLOSET("クローゼット", R.drawable.ic_nav_closet)
 }
 private enum class RoomPicker { HOME, COMMUNITY }
 
@@ -183,6 +184,7 @@ internal fun LayeRoomApp(model: LayeRoomViewModel = viewModel()) {
                             onSuggest = { model.requestSuggestionPreview(); aiMode = AiMode.SUGGEST })
                         Tab.OUTFITS -> OutfitsScreen(model)
                         Tab.COMMUNITY -> CommunityScreen(model, communityLocation) { roomPicker = RoomPicker.COMMUNITY }
+                        Tab.CLOSET -> ClosetScreen(model)
                     }
                 }
             }

@@ -29,3 +29,5 @@ Copyright Google LLC. Licensed under the Apache License, Version 2.0.
 | `ic_sun` | `sunny` |
 | `ic_check` | `check_circle` |
 | `ic_close` | `close` |
+| `ic_nav_closet` | `checkroom` |
+| `ic_delete` | `delete` |
