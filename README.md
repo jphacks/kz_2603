@@ -3,7 +3,7 @@
 **今日の一着を、心地よく。** — 講義室の室温と外の天気から、「その部屋」で心地よく過ごせる服を提案する Android アプリ
 
 <p align="center">
-  <img src="docs/images/layeroom-main.jpeg" alt="LayeRoom のメインビジュアル" width="100%">
+  <img src="docs/images/layeroom-main.png" alt="LayeRoom のメインビジュアル" width="100%">
 </p>
 
 ## 目次
