@@ -51,16 +51,17 @@ lifecycleScope.launch {
 | 起動時 | `session()`（null なら `start(nickname)`） |
 | 場所のプルダウン | `rooms()`（センサーの部屋は実測、ほかは仮の値。今日の体感の件数つき） |
 | 提案タブ: 室温・湿度・金沢の気温・不快指数 | `conditions(classroom)`（`notices` に注意書き） |
-| 提案タブ・コーデAI B「今日の服装を提案して」 | `suggestions(classroom)`（`mode == "general"` なら `general` を表示）。画像は `comboImage(upperId, lowerId)` |
+| 提案タブ・コーデAI B「今日の服装を提案して」 | `suggestions(classroom)`（`mode == "general"` か `suggestions` が空なら `general` を表示）。画像は `comboImage(upperId, lowerId)` |
+| 提案のマネキン着用画像 | `mannequinImage(upperId, lowerId)`（1分ほどかかる。同じ組み合わせは覚えておく）。作れるかは `canRenderMannequin` |
 | コーデAI A「この写真で診断する」 | `review(jpeg, classroom)`（切り抜きは `itemImages`） |
 | 診断結果の「このコーデを保存」 | `save(draftId)`（30分で消える） |
-| 提案結果の「このコーデを保存」 | `saveRecommendation(top, bottom, reason)` / `latestRecommendation()` |
+| 提案結果の「このコーデを保存」 | `saveRecommendation(top, bottom, reason)`（下の服は null でもよい） / `latestRecommendation()` |
 | 気温別コーデ | `outfits(temp, kind = "outdoor" or "indoor", within = 2.0)`。画像は `comboImage(upper?.garmentId, lower?.garmentId)` |
 | 着た感想 | `feedback(outfitId, "暑かった" / "寒かった" / "ちょうどいい")` |
-| 保存した服・誤認識の削除 | `garments()` / `hideGarment(id)` / `garmentImage(id)` |
-| みんなのひろば | `posts(roomId)` / `post(roomId, feeling, comment)`（体感の選択肢は `feelings()`） |
+| クローゼット（保存した服・削除） | `garments()` / `hideGarment(id)` / `garmentImage(id)`（削除は db_server で消さず、`meta` に `hidden` を付けて隠す） |
+| 今日のひろば | `posts(roomId)` / `post(roomId, feeling, comment)`（体感の選択肢は `feelings()`） |
 
-どれも `suspend` 関数です（コルーチンの中で呼ぶ）。通信と画像処理はメインスレッドを止めません。
+`session()`・`feelings()`・`canRenderMannequin` 以外は `suspend` 関数です（コルーチンの中で呼ぶ）。通信と画像処理はメインスレッドを止めません。
 
 ## テスト
 
@@ -79,5 +80,5 @@ LIVE_DB_SERVER_URL=http://<db_server>:<port> OPENAI_API_KEY=sk-... ./gradlew :ba
 
 ## 既知の制限
 
-- 下なし（ワンピースなど）のおすすめは保存できない（db_server が `bottom_garment_id` を必須にしている）。
+- 天気から「今日の服装の目安」（ホーム上部）を決める処理は無い（画面は固定のサンプル）。
 - 👍/👎（服ごとの好み）は画面に無いので移植していない。
