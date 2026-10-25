@@ -1,0 +1,8 @@
+<resources>
+    <style name="AppTheme" parent="AppTheme.Base">
+        <!-- 起動画面：黒い背景に白いマーク（Neo の起動画面風） -->
+        <item name="android:windowSplashScreenBackground">@color/launcher_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/launcher_background</item>
+    </style>
+</resources>

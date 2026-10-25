@@ -1,0 +1,4 @@
+<resources>
+    <!-- アプリのアイコンと起動画面の背景（黒に白いハンガーと家） -->
+    <color name="launcher_background">#000000</color>
+</resources>

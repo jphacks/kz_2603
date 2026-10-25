@@ -1,0 +1,2 @@
+# Wi-Fi のパスワード・デバイスキー・接続先が入るのでコミットしない
+sensor_sender/arduino_secrets.h

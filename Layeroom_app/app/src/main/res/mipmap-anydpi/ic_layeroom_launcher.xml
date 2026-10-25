@@ -1,0 +1,5 @@
+<!-- Android 8.0 未満向け（minSdk 26 なので通常は mipmap-anydpi-v26 が使われる）。黒い背景に白いハンガーと家 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><shape android:shape="rectangle"><solid android:color="@color/launcher_background" /><corners android:radius="12dp" /></shape></item>
+    <item android:drawable="@drawable/ic_launcher_foreground" />
+</layer-list>
