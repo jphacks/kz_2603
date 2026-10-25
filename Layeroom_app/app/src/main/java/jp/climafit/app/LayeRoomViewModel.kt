@@ -52,6 +52,10 @@ class LayeRoomViewModel(application: Application, private val backend: LayeRoomB
     var reviews by mutableStateOf(PreviewData.reviews); private set
     /** 登録したユーザー名（未登録なら null） */
     var userName by mutableStateOf(backend?.session()?.nickname); private set
+    /** サーバーにつないでいて未登録なら、登録するまでほかの機能を使えないようにする（サンプル表示では求めない） */
+    val mustRegister: Boolean get() = backend != null && userName == null
+    var registering by mutableStateOf(false); private set
+    var registrationError by mutableStateOf<String?>(null); private set
     var roomName by mutableStateOf(rooms.first().name); private set
     val room: RoomUi get() = rooms.firstOrNull { it.name == roomName } ?: rooms.first()
     var notice by mutableStateOf<String?>(null); private set
@@ -178,16 +182,21 @@ class LayeRoomViewModel(application: Application, private val backend: LayeRoomB
         }
     }
 
-    /** 右上の歯車からのユーザー登録。 */
+    /** ユーザー登録（初回起動時の登録シート、または右上の歯車から）。 */
     fun register(name: String) {
         val b = backend ?: return
+        if (registering) return
+        registering = true; registrationError = null
         viewModelScope.launch {
             try {
                 userName = b.start(name).nickname
                 message("「${userName}」で登録しました")
                 loadLogs()
             } catch (e: BackendException) {
+                registrationError = errorText(e)
                 message(errorText(e))
+            } finally {
+                registering = false
             }
         }
     }

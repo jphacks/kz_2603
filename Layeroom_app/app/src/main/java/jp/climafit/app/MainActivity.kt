@@ -158,11 +158,15 @@ internal fun LayeRoomApp(model: LayeRoomViewModel = viewModel()) {
             }
         }
     }
-    if (showRegistration) {
-        RegistrationSheet(currentName = model.userName, onDismiss = { showRegistration = false }, onSubmit = { name ->
-            model.register(name)
-            showRegistration = false
-        })
+    // 未登録のまま起動したら、登録するまで閉じられない登録シートを出す（登録できたら自動で閉じる）
+    val mustRegister = model.mustRegister
+    if (showRegistration || mustRegister) {
+        RegistrationSheet(currentName = model.userName, required = mustRegister, busy = model.registering,
+            error = if (mustRegister) model.registrationError else null,
+            onDismiss = { showRegistration = false }, onSubmit = { name ->
+                model.register(name)
+                if (!mustRegister) showRegistration = false
+            })
     }
     val pickerTarget = roomPicker
     if (pickerTarget != null) {

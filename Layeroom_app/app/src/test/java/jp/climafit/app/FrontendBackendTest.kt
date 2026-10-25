@@ -165,18 +165,22 @@ class FrontendBackendTest {
             assertEquals(23.4, model.rooms[1].temperature, 0.0)
             assertEquals(16.0, model.outdoorTemperature, 0.0)
             assertNull(model.userName)
+            assertTrue(model.mustRegister)
         }
-        compose.onNodeWithTag("home-screen").performScrollToNode(hasTestTag("home-room-picker"))
-        compose.onNodeWithTag("home-room-picker").performClick()
-        compose.onNodeWithText("室温 23.4℃ · 湿度 55%").assertExists()   // 場所の選択シートにサーバーの値
-        selectLocation("201教室")
-
-        compose.onNodeWithTag("open-registration").performClick()
+        // 未登録で起動すると、登録シートが自動で開く
+        compose.onNodeWithTag("registration-sheet").assertExists()
         compose.onNodeWithTag("registration-name").performTextInput("金沢 太郎")
         compose.onNodeWithTag("registration-submit").performScrollTo().performClick()
         waitFor { model.userName != null }
         assertEquals("金沢 太郎", model.userName)
         assertEquals("""{"name":"金沢 太郎"}""", called("POST /users").single().second)
+        compose.waitForIdle()
+        compose.onNodeWithTag("registration-sheet").assertDoesNotExist()   // 登録できたら自動で閉じる
+
+        compose.onNodeWithTag("home-screen").performScrollToNode(hasTestTag("home-room-picker"))
+        compose.onNodeWithTag("home-room-picker").performClick()
+        compose.onNodeWithText("室温 23.4℃ · 湿度 55%").assertExists()   // 場所の選択シートにサーバーの値
+        selectLocation("201教室")
     }
 
     @Test fun photoDiagnosisShowsTheResultAndSavesTheOutfit() {
@@ -196,14 +200,25 @@ class FrontendBackendTest {
         assertEquals(2, called("POST /outfits/11/garments").size)
     }
 
-    @Test fun photoDiagnosisBeforeRegistrationAsksToRegister() {
-        pickerResult = photoUri()
+    @Test fun unregisteredUserCannotCloseTheRegistrationSheet() {
         val model = showApp(session = null)
-        compose.onNodeWithTag("home-screen").performScrollToNode(hasTestTag("home-photo"))
-        compose.onNodeWithTag("home-photo").performClick()
-        waitFor { model.diagnosisError != null }
-        compose.onNodeWithText("右上の歯車からユーザー登録をしてください。").assertExists()
-        assertTrue(called("POST /outfits").isEmpty())
+        compose.onNodeWithTag("registration-sheet").assertExists()
+        compose.onNodeWithText("はじめに、ユーザー名を登録してください。").assertExists()
+        compose.onNodeWithText("閉じる").assertDoesNotExist()             // 閉じるボタンが無い
+        compose.onNodeWithTag("registration-submit").assertIsNotEnabled()  // 名前を入れるまで押せない
+        compose.runOnIdle { assertTrue(model.mustRegister) }
+        assertTrue(called("POST /users").isEmpty())
+    }
+
+    @Test fun registeredUserCanStillCloseTheRegistrationSheet() {
+        val model = showApp()
+        compose.runOnIdle { assertFalse(model.mustRegister) }
+        compose.onNodeWithTag("registration-sheet").assertDoesNotExist()   // 登録済みなら自動では開かない
+        compose.onNodeWithTag("open-registration").performClick()
+        compose.onNodeWithText("あなたの名前で、今日のひろばへ。").assertExists()
+        compose.onNodeWithText("閉じる").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("registration-sheet").assertDoesNotExist()
     }
 
     @Test fun suggestionComesFromSavedClothesAndCanBeSaved() {
