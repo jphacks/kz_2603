@@ -114,7 +114,9 @@ class FrontendBackendTest {
         val model = LayeRoomViewModel(app, backend)
         val registry = object : ActivityResultRegistry() {
             override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I, options: ActivityOptionsCompat?) {
-                dispatchResult(requestCode, pickerResult)
+                // カメラの許可は断ったことにして、写真フォルダからの選択で進める
+                if (contract is androidx.activity.result.contract.ActivityResultContracts.RequestPermission) dispatchResult(requestCode, false)
+                else dispatchResult(requestCode, pickerResult)
             }
         }
         val owner = object : ActivityResultRegistryOwner { override val activityResultRegistry = registry }
@@ -188,6 +190,7 @@ class FrontendBackendTest {
         val model = showApp()
         compose.onNodeWithTag("home-screen").performScrollToNode(hasTestTag("home-photo"))
         compose.onNodeWithTag("home-photo").performClick()
+        compose.onNodeWithTag("camera-gallery").performClick()   // カメラの左下から写真フォルダを開く
         waitFor { model.diagnosis != null || model.diagnosisError != null }
         assertNull(model.diagnosisError)
         compose.onNodeWithTag("diagnosis-result").assertExists()

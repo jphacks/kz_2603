@@ -92,10 +92,17 @@ class FrontendUiTest {
     }
 
     private var pickerLaunches = 0
+    private var cameraPermissionRequests = 0
     private fun showApp(photoResult: Uri? = null): LayeRoomViewModel {
         val model = LayeRoomViewModel(RuntimeEnvironment.getApplication())
         val registry = object : ActivityResultRegistry() {
             override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I, options: ActivityOptionsCompat?) {
+                if (contract is ActivityResultContracts.RequestPermission) {
+                    // テストではカメラの許可を断ったことにする（写真フォルダからの選択で進める）
+                    cameraPermissionRequests++
+                    dispatchResult(requestCode, false)
+                    return
+                }
                 check(contract is ActivityResultContracts.PickVisualMedia)
                 pickerLaunches++
                 dispatchResult(requestCode, photoResult)
@@ -117,10 +124,35 @@ class FrontendUiTest {
     private fun revealHomeAction(tag: String) {
         compose.onNodeWithTag("home-screen").performScrollToNode(hasTestTag(tag))
     }
+    /** ホームの写真でコーデ診断 → カメラ → 左下の写真フォルダから選ぶ。 */
     private fun launchPhotoSelection() {
         revealHomeAction("home-photo")
         compose.onNodeWithTag("home-photo").performScrollTo().performClick()
+        compose.onNodeWithTag("camera-screen").assertExists()
+        compose.onNodeWithTag("camera-gallery").performClick()
         compose.runOnIdle { assertEquals("Native photo picker must have opened once", 1, pickerLaunches) }
+    }
+
+    @Test fun photoButtonOpensCameraWithShutterGalleryAndSwitch() {
+        showApp()
+        revealHomeAction("home-photo")
+        compose.onNodeWithTag("home-photo").performScrollTo().performClick()
+        compose.onNodeWithTag("camera-screen").assertExists()
+        compose.onNodeWithTag("tab-HOME").assertDoesNotExist()             // カメラは全画面
+        compose.runOnIdle { assertEquals(1, cameraPermissionRequests); assertEquals(0, pickerLaunches) }
+        // 下の並び：左に写真フォルダ、真ん中にシャッター、右にカメラの切り替え
+        val gallery = compose.onNodeWithTag("camera-gallery").fetchSemanticsNode().boundsInRoot
+        val shutter = compose.onNodeWithTag("camera-shutter").fetchSemanticsNode().boundsInRoot
+        val switch = compose.onNodeWithTag("camera-switch").fetchSemanticsNode().boundsInRoot
+        assertTrue(gallery.center.x < shutter.center.x && shutter.center.x < switch.center.x)
+        assertTrue(shutter.width > gallery.width)
+        // 許可が無いと、撮影と切り替えはできず、写真フォルダは選べる
+        compose.onNodeWithTag("camera-message").assertExists()
+        compose.onNodeWithTag("camera-shutter").assertIsNotEnabled()
+        compose.onNodeWithTag("camera-switch").assertIsNotEnabled()
+        compose.onNodeWithTag("camera-gallery").assertIsEnabled()
+        compose.onNodeWithTag("camera-close").performClick()
+        compose.onNodeWithTag("home-screen").assertExists()
     }
     private fun photoUri(valid: Boolean = true): Uri {
         val app = RuntimeEnvironment.getApplication()
@@ -206,12 +238,14 @@ class FrontendUiTest {
         compose.onNodeWithText("コーデを確認しています").assertExists()
     }
 
-    @Test fun oneTapOpensNativePickerAndCancellationKeepsHomeWithoutSubmitting() {
+    @Test fun pickerCancellationReturnsToCameraWithoutSubmitting() {
         val model = showApp(null)
         launchPhotoSelection()
-        compose.onNodeWithTag("home-screen").assertExists()
+        compose.onNodeWithTag("camera-screen").assertExists()            // キャンセルしたらカメラに戻る
         compose.onNodeWithTag("photo-diagnosis-screen").assertDoesNotExist()
         compose.runOnIdle { assertNull(model.latestAiRequest) }
+        compose.onNodeWithTag("camera-close").performClick()
+        compose.onNodeWithTag("home-screen").assertExists()
     }
 
     @Test fun unreadablePhotoShowsRetryWithoutPreparingDiagnosisRequest() {

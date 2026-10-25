@@ -115,26 +115,37 @@ class LayeRoomViewModel(application: Application, private val backend: LayeRoomB
         savingDiagnosis = false; diagnosisSaved = false
         if (latestAiRequest?.mode == AiMode.PHOTO) latestAiRequest = null
     }
-    fun loadPhoto(uri: Uri) {
+    /** 写真フォルダから選んだ写真を読み込む。 */
+    fun loadPhoto(uri: Uri) = loadPhotoFrom {
+        val resolver = getApplication<Application>().contentResolver
+        require(resolver.getType(uri)?.startsWith("image/") == true)
+        resolver.openInputStream(uri)?.use { input ->
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(8192)
+            var total = 0
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                total += read; require(total <= 10 * 1024 * 1024)
+                output.write(buffer, 0, read)
+            }
+            output.toByteArray()
+        } ?: error("Unreadable image")
+    }
+
+    /** アプリのカメラで撮った写真（JPEG、向きは直したもの）を読み込む。 */
+    fun loadCapturedPhoto(jpeg: ByteArray) = loadPhotoFrom {
+        require(jpeg.size <= 10 * 1024 * 1024)
+        jpeg
+    }
+
+    private fun loadPhotoFrom(read: () -> ByteArray) {
         clearPhoto(); loadingPhoto = true
         val version = photoVersion
         photoJob = viewModelScope.launch {
             try {
                 val (bitmap, data) = withContext(Dispatchers.IO) {
-                    val resolver = getApplication<Application>().contentResolver
-                    require(resolver.getType(uri)?.startsWith("image/") == true)
-                    val data = resolver.openInputStream(uri)?.use { input ->
-                        val output = ByteArrayOutputStream()
-                        val buffer = ByteArray(8192)
-                        var total = 0
-                        while (true) {
-                            val read = input.read(buffer)
-                            if (read < 0) break
-                            total += read; require(total <= 10 * 1024 * 1024)
-                            output.write(buffer, 0, read)
-                        }
-                        output.toByteArray()
-                    } ?: error("Unreadable image")
+                    val data = read()
                     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
                     require(bounds.outWidth > 0 && bounds.outHeight > 0)

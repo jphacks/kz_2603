@@ -57,11 +57,11 @@ internal fun HomeScreen(model: LayeRoomViewModel, onPhoto: () -> Unit, onChooseR
                         Surface(color = Color.White.copy(alpha = 0.12f), shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp)) {
                             Box(Modifier.padding(8.dp), contentAlignment = Alignment.Center) {
-                                Text("写真を1枚選んで\nすぐに診断", style = MaterialTheme.typography.labelMedium,
+                                Text("カメラで撮るか、\n写真を選んで診断", style = MaterialTheme.typography.labelMedium,
                                     color = Color.White.copy(alpha = 0.85f), textAlign = TextAlign.Center)
                             }
                         }
-                        ActionLabel("写真を選ぶ", Color.White)
+                        ActionLabel("カメラを開く", Color.White)
                     }
                 }
                 // 右：場所別のおすすめ（白）

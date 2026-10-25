@@ -60,6 +60,7 @@ internal fun LayeRoomApp(model: LayeRoomViewModel = viewModel()) {
     var roomPicker by rememberSaveable { mutableStateOf<RoomPicker?>(null) }
     var communityLocation by rememberSaveable { mutableStateOf<String?>(null) }
     var showRegistration by remember { mutableStateOf(false) }
+    var showCamera by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val screens = rememberSaveableStateHolder()
     val notice = model.notice
@@ -71,7 +72,13 @@ internal fun LayeRoomApp(model: LayeRoomViewModel = viewModel()) {
         tab = Tab.HOME
     }
     fun acceptPhoto(uri: Uri) {
+        showCamera = false
         model.loadPhoto(uri)
+        aiMode = AiMode.PHOTO
+    }
+    fun acceptCaptured(jpeg: ByteArray) {
+        showCamera = false
+        model.loadCapturedPhoto(jpeg)
         aiMode = AiMode.PHOTO
     }
     val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -82,7 +89,11 @@ internal fun LayeRoomApp(model: LayeRoomViewModel = viewModel()) {
         catch (_: ActivityNotFoundException) { model.message("写真選択を開けませんでした。端末の写真アプリをご確認ください。") }
     }
     BackHandler(enabled = aiMode != null) { backHome() }
-    Scaffold(
+    BackHandler(enabled = showCamera) { showCamera = false }
+    // 写真でコーデ診断は、まずアプリのカメラを開く（左下のボタンから写真フォルダも選べる）
+    if (showCamera) CameraScreen(onCaptured = ::acceptCaptured, onPickFromGallery = ::openPhotoPicker,
+        onClose = { showCamera = false })
+    else Scaffold(
         containerColor = Paper,
         topBar = {
             // Neo 風：左に黒いチップ（ロゴ）、右にグレーの角丸ボタン。その下に大きな太字の見出し（今のタブ名）
@@ -143,12 +154,12 @@ internal fun LayeRoomApp(model: LayeRoomViewModel = viewModel()) {
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
             val selectedAiMode = aiMode
             if (selectedAiMode != null) {
-                AiStatusScreen(model, selectedAiMode, onBack = ::backHome, onRetryPhoto = ::openPhotoPicker)
+                AiStatusScreen(model, selectedAiMode, onBack = ::backHome, onRetryPhoto = { showCamera = true })
             } else {
                 screens.SaveableStateProvider(tab.name) {
                     when (tab) {
                         Tab.HOME -> HomeScreen(model,
-                            onPhoto = ::openPhotoPicker,
+                            onPhoto = { showCamera = true },
                             onChooseRoom = { roomPicker = RoomPicker.HOME },
                             onSuggest = { model.requestSuggestionPreview(); aiMode = AiMode.SUGGEST })
                         Tab.OUTFITS -> OutfitsScreen(model)
