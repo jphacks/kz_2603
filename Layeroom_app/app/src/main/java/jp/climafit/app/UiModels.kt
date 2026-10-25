@@ -26,6 +26,19 @@ data class OutfitLogUi(
     /** 保存した上下の服を1枚にした画像（バックエンド接続時）。null なら photo を表示する */
     val image: android.graphics.Bitmap? = null,
 )
+/** クローゼットの服1枚（同じ服が何回も保存されていれば、その分だけ並ぶ）。 */
+data class ClosetItemUi(
+    val id: String,
+    /** "upper"（上の服）/ "lower"（下の服） */
+    val slot: String,
+    /** 「白のシャツ」のような名前 */
+    val title: String,
+    val photo: Int,
+    /** 保存したときに切り抜いた服の画像（バックエンド接続時）。null なら photo を表示する */
+    val image: android.graphics.Bitmap? = null,
+    /** db_server の服ID（サンプルは null） */
+    val garmentId: Long? = null,
+)
 data class ReviewUi(val id: String, val location: String, val feel: String, val comment: String, val date: String)
 enum class TemperatureMode(val label: String) {
     ALL("すべて"), OUTDOOR("今の金沢"), CURRENT("今の室温"), CUSTOM("温度を指定")
@@ -61,6 +74,11 @@ object PreviewData {
     val logs = listOf(
         OutfitLogUi("preview-1", "10月24日", "201教室", 24.2, 18.5, "カーディガンで軽やかに", "脱ぎ着しやすいカーディガンで、気温差に合わせて。", R.drawable.outfit_warm),
         OutfitLogUi("preview-2", "10月23日", "実験室3", 19.5, 17.0, "肌寒い日のライトジャケット", "軽いジャケットを重ねて、ひんやりする日も心地よく。", R.drawable.outfit_cool),
+    )
+    val closet = listOf(
+        ClosetItemUi("preview-1", "upper", "白のTシャツ", R.drawable.guide_tshirt),
+        ClosetItemUi("preview-2", "upper", "ベージュのカーディガン", R.drawable.guide_cardigan),
+        ClosetItemUi("preview-3", "lower", "紺のズボン", R.drawable.guide_trousers),
     )
     val reviews = listOf(
         ReviewUi("preview-1", "図書館", "少し寒い", "窓際の席は少しひんやり。薄いカーディガンがあるとちょうどよかったです。", "10分前"),

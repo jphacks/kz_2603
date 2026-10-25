@@ -50,6 +50,10 @@ class LayeRoomViewModel(application: Application, private val backend: LayeRoomB
     var outdoorTemperature by mutableStateOf(PreviewData.outdoorTemperature); private set
     var logs by mutableStateOf(PreviewData.logs); private set
     var reviews by mutableStateOf(PreviewData.reviews); private set
+    var closet by mutableStateOf(PreviewData.closet); private set
+    var loadingCloset by mutableStateOf(false); private set
+    /** 削除中の服（ClosetItemUi.id） */
+    var deletingClothing by mutableStateOf<String?>(null); private set
     /** 登録したユーザー名（未登録なら null） */
     var userName by mutableStateOf(backend?.session()?.nickname); private set
     /** サーバーにつないでいて未登録なら、登録するまでほかの機能を使えないようにする（サンプル表示では求めない） */
@@ -369,6 +373,65 @@ class LayeRoomViewModel(application: Application, private val backend: LayeRoomB
                 }
             } catch (e: BackendException) {
                 message(errorText(e))
+            }
+        }
+    }
+
+    private var closetJob: Job? = null
+    /** 一度読んだ服の画像（クローゼットを開くたびに読み直さないように） */
+    private val closetImages = mutableMapOf<Long, Bitmap>()
+
+    /** クローゼット：保存した服（隠した服を除く、新しい順）を読み込む。 */
+    fun loadCloset() {
+        val b = backend ?: return
+        if (b.session() == null) { closet = emptyList(); return }
+        if (closetJob?.isActive == true) return
+        closetJob = viewModelScope.launch {
+            loadingCloset = true
+            try {
+                closet = b.garments().garments.mapNotNull { g ->
+                    val id = g.garmentId ?: return@mapNotNull null
+                    ClosetItemUi(id.toString(), g.slot, "${g.color}の${g.typeJa}",
+                        if (g.slot == "lower") R.drawable.guide_trousers else R.drawable.guide_tshirt,
+                        closetImages[id], garmentId = id)
+                }
+            } catch (e: BackendException) {
+                message(errorText(e))
+            } finally {
+                loadingCloset = false
+            }
+            // 画像は後から順に読み込む
+            for (item in closet) {
+                val id = item.garmentId ?: continue
+                if (closetImages.containsKey(id)) continue
+                val image = runCatching { decode(b.garmentImage(id)) }.getOrNull() ?: continue
+                closetImages[id] = image
+                closet = closet.map { if (it.garmentId == id) it.copy(image = image) else it }
+            }
+        }
+    }
+
+    /** クローゼットから服を消す（db_server では隠すだけ。気温別コーデの記録は残る）。 */
+    fun deleteClothing(id: String) {
+        val item = closet.firstOrNull { it.id == id } ?: return
+        if (deletingClothing != null) return
+        val b = backend
+        val garmentId = item.garmentId
+        if (b == null || garmentId == null) {   // サンプル表示は画面から消すだけ
+            closet = closet.filterNot { it.id == id }
+            message("「${item.title}」を削除しました")
+            return
+        }
+        deletingClothing = id
+        viewModelScope.launch {
+            try {
+                b.hideGarment(garmentId)
+                closet = closet.filterNot { it.id == id }
+                message("「${item.title}」を削除しました")
+            } catch (e: BackendException) {
+                message(errorText(e))
+            } finally {
+                deletingClothing = null
             }
         }
     }

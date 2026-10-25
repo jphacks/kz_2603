@@ -67,7 +67,7 @@ class FrontendUiTest {
             R.drawable.ic_camera, R.drawable.ic_nav_sun, R.drawable.ic_pin, R.drawable.ic_settings,
             R.drawable.ic_back, R.drawable.ic_add, R.drawable.ic_expand_more, R.drawable.ic_arrow_forward,
             R.drawable.ic_person, R.drawable.ic_save, R.drawable.ic_filter, R.drawable.ic_sun,
-            R.drawable.ic_check, R.drawable.ic_close)
+            R.drawable.ic_check, R.drawable.ic_close, R.drawable.ic_nav_closet, R.drawable.ic_delete)
         val sheet = Bitmap.createBitmap(600, 360, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(sheet)
         canvas.drawColor(android.graphics.Color.rgb(250, 247, 242))
@@ -89,6 +89,36 @@ class FrontendUiTest {
         val output = File("build/reports/material-symbols.png")
         output.parentFile?.mkdirs()
         output.outputStream().use { sheet.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    @Test fun closetListsUpperAndLowerClothesAndDeletesAfterConfirming() {
+        val model = showApp()
+        compose.onNodeWithTag("tab-CLOSET").performClick()
+        compose.onNodeWithTag("closet-screen").assertExists()
+        // 最初は上の服だけ。タブで下の服に切り替えられる
+        compose.onNodeWithTag("closet-slot-upper").assertIsSelected()
+        compose.onNodeWithText("上の服 · 2枚").assertExists()
+        compose.onNodeWithText("白のTシャツ").assertExists()
+        compose.onNodeWithText("紺のズボン").assertDoesNotExist()
+        compose.onNodeWithText("下の服 · 1枚").performClick()
+        compose.onNodeWithTag("closet-slot-lower").assertIsSelected()
+        compose.onNodeWithText("紺のズボン").assertExists()
+        compose.onNodeWithText("白のTシャツ").assertDoesNotExist()
+        compose.onNodeWithTag("closet-slot-upper").performClick()
+        // やめれば消えない
+        compose.onNodeWithTag("closet-delete-preview-1").performClick()
+        compose.onNodeWithTag("closet-delete-dialog").assertExists()
+        compose.onNodeWithText("やめる").performClick()
+        compose.onNodeWithTag("closet-delete-dialog").assertDoesNotExist()
+        compose.onNodeWithText("白のTシャツ").assertExists()
+        // 削除するを押すと消える
+        compose.onNodeWithTag("closet-delete-preview-1").performClick()
+        compose.onNodeWithTag("closet-delete-confirm").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("closet-item-preview-1").assertDoesNotExist()
+        compose.onNodeWithText("ベージュのカーディガン").assertExists()
+        compose.onNodeWithText("上の服 · 1枚").assertExists()
+        compose.runOnIdle { assertEquals(listOf("preview-2", "preview-3"), model.closet.map { it.id }) }
     }
 
     private var pickerLaunches = 0
@@ -174,13 +204,14 @@ class FrontendUiTest {
         return uri
     }
 
-    @Test fun startsOnHomeWithThreeTabsInRequestedOrderAndSideBySideActions() {
+    @Test fun startsOnHomeWithFourTabsInRequestedOrderAndSideBySideActions() {
         showApp()
         compose.onNodeWithTag("tab-HOME").assertIsSelected()
-        val left = compose.onNodeWithTag("tab-OUTFITS").fetchSemanticsNode().boundsInRoot
-        val center = compose.onNodeWithTag("tab-HOME").fetchSemanticsNode().boundsInRoot
-        val right = compose.onNodeWithTag("tab-COMMUNITY").fetchSemanticsNode().boundsInRoot
-        assertTrue(left.center.x < center.center.x && center.center.x < right.center.x)
+        // 左から ホーム・気温別コーデ・今日のひろば・クローゼット
+        val xs = listOf("HOME", "OUTFITS", "COMMUNITY", "CLOSET")
+            .map { compose.onNodeWithTag("tab-$it").fetchSemanticsNode().boundsInRoot.center.x }
+        assertEquals(xs.sorted(), xs)
+        compose.onNodeWithText("クローゼット").assertExists()
         compose.onNodeWithTag("home-recommendation").assertExists()
         compose.onNodeWithText("今日の服装の目安").assertExists()
         compose.onNodeWithText("Tシャツ").assertExists()
