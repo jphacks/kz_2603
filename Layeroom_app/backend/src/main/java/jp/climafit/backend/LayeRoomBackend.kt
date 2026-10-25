@@ -221,13 +221,11 @@ class LayeRoomBackend(
         val temp: Double, val humidity: Double, val humidityShared: Boolean, val humidityIsDummy: Boolean,
         val di: Double?, val diLabel: String, val outdoorTemp: Double?, val outdoorHumidity: Double?, val outdoorDi: Double?,
         val warnings: List<String>,
+        /** 今日の予報の最低・最高気温（外の判定を、朝夕の冷えも見て行うため）。 */
+        val outdoorMin: Double? = null, val outdoorMax: Double? = null,
     ) {
-        val notice: String
-            get() = when {
-                !humidityIsDummy -> ""
-                humidityShared -> "湿度は室内外で共通の値です（室内の湿度センサーが未接続）。判定は気温だけで行っています。"
-                else -> "室内の湿度は使っていません（センサー未接続）。判定は気温だけで行っています。"
-            }
+        /** 画面に出す注意書き。デモでは出さない（判定は気温だけで行っていて、湿度は結果に影響しない）。 */
+        val notice: String get() = ""
     }
 
     private suspend fun climate(classroom: String): Climate {
@@ -250,7 +248,8 @@ class LayeRoomBackend(
         val dummy = missing || source != "sensor"   // 湿度は db_server が「実測」と言うときだけ使う
         val di = if (dummy) null else Comfort.discomfortIndex(temp, humidity)
         val outDi = if (!dummy && outT != null && oh != null) Comfort.discomfortIndex(outT, oh) else null
-        return Climate(temp, humidity, shared, dummy, di, di?.let(Comfort::diLabel).orEmpty(), outT, oh, outDi, warnings)
+        return Climate(temp, humidity, shared, dummy, di, di?.let(Comfort::diLabel).orEmpty(), outT, oh, outDi, warnings,
+            outdoorMin = out?.num("forecast_min_temp"), outdoorMax = out?.num("forecast_max_temp"))
     }
 
     // ======================================================================
@@ -360,10 +359,14 @@ class LayeRoomBackend(
             throw BackendException(ErrorKind.NO_CLOTHES, "服が見つかりませんでした。全身か上半身が写るように撮り直してください（顔は写さなくて大丈夫です）。")
         }
 
-        val need = Comfort.requiredClo(clim.temp, clim.di, clim.humidityIsDummy)
-        val result = Comfort.judge(items, need)   // 判定には写っている服を全部使う
+        val need = Comfort.requiredCloIso(clim.temp, clim.di, clim.humidityIsDummy)
+        val result = Comfort.judge(items, need, Comfort.TOLERANCE_ISO)   // 判定には写っている服を全部使う
         val outdoor = clim.outdoorTemp?.let { t ->
-            val o = Comfort.judgeOutdoor(result.outfitClo, Comfort.requiredCloOutdoor(t))
+            // 今の気温だけでなく、今日の予報（最低と最高の平均）も見て、寒いほうで判定する。
+            // 上着は1日着るもの。朝夕に冷えるのに「外では暑いので脱いで」と言わないため。
+            val mn = clim.outdoorMin; val mx = clim.outdoorMax
+            val judgeT = if (mn != null && mx != null) minOf(t, (mn + mx) / 2) else t
+            val o = Comfort.judgeOutdoor(result.outfitClo, Comfort.requiredCloOutdoor(judgeT))
             OutdoorInfo(t, clim.outdoorHumidity, clim.outdoorDi, o.verdict, o.verdictJa, o.needClo)
         }
         // 好みは「集計」だけを使う。環境とコーデを結びつけた記憶（前回の判定など）は使わない。
@@ -447,7 +450,7 @@ class LayeRoomBackend(
     suspend fun suggestions(classroom: String): Suggestions {
         val s = requireSession()
         val clim = climate(classroom)
-        val need = Comfort.requiredClo(clim.temp, clim.di, clim.humidityIsDummy)
+        val need = Comfort.requiredCloIso(clim.temp, clim.di, clim.humidityIsDummy)
         val general = General.suggest(need, clim.temp, clim.outdoorTemp).map {
             GeneralSuggestion(it.title, it.description, it.imageKey, it.items.map { i -> i.typeJa }, it.bring?.typeJa)
         }
@@ -463,7 +466,8 @@ class LayeRoomBackend(
         val yesterday = today().minusDays(1).toString()
         val excluded = garments.filter { it.takenDate == yesterday }.map(Suggest::signature).toSet()   // 昨日着た服は除く
         val pref = Preference.build(garments)
-        val combos = Suggest.outfits(garments, need, excluded, pref)
+        // 合う組み合わせを全部出し、毎回混ぜて3件を選ぶ（手持ちが少なくても、同じ服ばかりにならないように）
+        val combos = Suggest.outfits(garments, need, excluded, pref, limit = Int.MAX_VALUE).shuffled().take(3)
         return Suggestions(
             "personal", need, clim.temp, clim.outdoorTemp,
             combos.map { c ->

@@ -35,20 +35,21 @@ class OpenAi(
     private val apiKey: String?,
     private val baseUrl: String = "https://api.openai.com/v1",
     /** 先頭から順に試し、使えない(404/403)なら次へ。 */
-    val models: List<String> = listOf("gpt-4o", "gpt-4o-mini"),
+    val models: List<String> = listOf("gpt-6-luna", "gpt-4o", "gpt-4o-mini"),
     /** 画像の編集（マネキン画像）に使うモデル。先頭から順に試す。 */
     val imageModels: List<String> = DEFAULT_IMAGE_MODELS,
 ) {
     val isConfigured: Boolean get() = !apiKey.isNullOrBlank() || !baseUrl.startsWith("https://api.openai.com")
 
     /** messages を送り、schema の形の JSON を返す。 */
-    suspend fun structured(messages: JsonArray, schemaName: String, schema: JsonObject): JsonObject {
+    suspend fun structured(messages: JsonArray, schemaName: String, schema: JsonObject, temperature: Double? = null): JsonObject {
         if (!isConfigured) throw OpenAiException("OpenAI のキーが設定されていません")
         var last: String? = null
         for (model in models) {
             val body = buildJsonObject {
                 put("model", model)
                 put("messages", messages)
+                temperature?.let { put("temperature", it) }
                 put("response_format", buildJsonObject {
                     put("type", "json_schema")
                     put("json_schema", buildJsonObject {
@@ -69,8 +70,9 @@ class OpenAi(
                 throw OpenAiException("OpenAIに接続できません: ${e.message}", e)
             }
             val text = res.bodyAsText()
-            if (res.status == HttpStatusCode.NotFound || res.status == HttpStatusCode.Forbidden) {
-                last = "$model: ${res.status}"   // このキーで使えないモデル → 次を試す
+            if (res.status == HttpStatusCode.NotFound || res.status == HttpStatusCode.Forbidden ||
+                res.status == HttpStatusCode.BadRequest) {
+                last = "$model: ${res.status} ${text.take(120)}"   // このキーで使えない／このモデルが受け付けない → 次を試す
                 continue
             }
             if (res.status.value >= 400) throw OpenAiException("OpenAIの呼び出しに失敗: ${res.status} ${text.take(200)}")

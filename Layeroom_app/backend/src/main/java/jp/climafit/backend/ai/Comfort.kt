@@ -13,6 +13,8 @@ object Comfort {
     const val BASE_CLO = 0.15   // 下着・靴下など、写真に写らない分の固定値
     const val TOLERANCE = 0.2   // ±これ以内なら「ちょうど」
     const val TOLERANCE_OUT = 0.3   // 屋外は少し広めに許容
+    /** 室内の許容幅。ASHRAE 55 の快適範囲(−0.5<PMV<+0.5、約±2℃)にあたる。 */
+    const val TOLERANCE_ISO = 0.3
 
     data class GarmentType(val ja: String, val clo: Double, val layer: String)
 
@@ -81,6 +83,16 @@ object Comfort {
         return pyRound(maxOf(0.3, minOf(2.0, need)), 2)
     }
 
+    /**
+     * ISO 7730 の PMV=0 の計算(座位1.2met・湿度50%・風0.1m/s)に合わせた必要な暖かさ。
+     * 21.5℃で1.0clo、1℃下がるごとに約0.16clo。湿度が本物のときだけ、不快指数で少し補正する。
+     */
+    fun requiredCloIso(indoorTemp: Double, di: Double? = null, humidityIsDummy: Boolean = true): Double {
+        var need = 1.0 + (21.5 - indoorTemp) / 6.4
+        if (di != null && !humidityIsDummy) need -= maxOf(-0.2, minOf(0.2, 0.04 * (di - 72)))
+        return pyRound(maxOf(0.3, minOf(2.0, need)), 2)
+    }
+
     /** 屋外で必要な暖かさ。歩くので、室内より気温の変化に対して必要量の増え方がゆるやか。 */
     fun requiredCloOutdoor(outdoorTemp: Double): Double =
         pyRound(maxOf(0.3, minOf(2.0, 0.7 + (20.0 - outdoorTemp) / 14.0)), 2)
@@ -111,17 +123,17 @@ object Comfort {
     )
 
     /** 上着(outer)を脱いだ場合も見る。 */
-    fun judge(items: List<WornItem>, need: Double): Judge {
+    fun judge(items: List<WornItem>, need: Double, tol: Double = TOLERANCE): Judge {
         val total = outfitClo(items)
         val diff = pyRound(total - need, 2)
         val outers = items.filter { layerOf(it.type) == "outer" }
         val outerClo = outers.pySumOf { itemClo(it.type, it.thickness) }
         val withoutOuter = pyRound(total - outerClo, 2)
         val (verdict, s) = when {
-            diff > TOLERANCE ->
-                if (outers.isNotEmpty() && abs(withoutOuter - need) <= TOLERANCE) "ok_remove" to minOf(90, score(withoutOuter - need))
+            diff > tol ->
+                if (outers.isNotEmpty() && abs(withoutOuter - need) <= tol) "ok_remove" to minOf(90, score(withoutOuter - need))
                 else "too_hot" to score(diff)
-            diff < -TOLERANCE -> "too_cold" to score(diff)
+            diff < -tol -> "too_cold" to score(diff)
             else -> "ok" to score(diff)
         }
         return Judge(

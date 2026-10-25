@@ -43,7 +43,7 @@ class OpenAiVision(private val openAi: OpenAi) : Vision {
             }))
         }
         val out = try {
-            openAi.structured(messages, "outfit", schema())
+            openAi.structured(messages, "outfit", schema(), temperature = 0.0)
         } catch (e: OpenAiException) {
             throw VisionException(e.message ?: "OpenAIの呼び出しに失敗", e)
         }
