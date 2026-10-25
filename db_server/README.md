@@ -1,7 +1,6 @@
 # 服装提案AI DBサーバー
 
 服装提案AIアプリ（LayeRoom）のデータを受け取り・保存し・返すサーバー。
-要件と決定事項の経緯は [requirements.md](requirements.md) を参照。
 
 - DBサーバーは **AIを呼ばない**。AI（外部AI APIの呼び出し）は Android アプリ側で行う。
 - 服の選択・おすすめの判断も AI 側。サーバーは絞り込まずにデータを返し、AIの結果を保存するだけ。
@@ -26,7 +25,6 @@ Androidアプリ（AI含む）                                │  (Docker Compo
 ```
 docker-compose.yml          db (PostgreSQL 16) + api (FastAPI)
 .env.example                設定のひな形（.env は Git に上げない）
-requirements.md             要件定義
 api/app/
   main.py                   起動処理（テーブル作成・列追加・センサーと部屋の登録・天気の定期取得）
   models.py                 テーブル定義
